@@ -1,5 +1,5 @@
-// Base API URL helper using relative URLs handled by Vite Proxy
-const API_URL = '';
+// Base API URL helper uses Vite env variable for production and relative URL for local dev.
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 export const apiCall = async (endpoint, options = {}) => {
   const token = localStorage.getItem('token');
