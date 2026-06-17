@@ -5,11 +5,15 @@ require('dotenv').config();
 
 // Route Imports
 const authRoutes = require('./routes/authRoutes');
-// const productRoutes = require('./routes/productRoutes');
-// const wishlistRoutes = require('./routes/wishlistRoutes');
-// const voucherRoutes = require('./routes/voucherRoutes');
-// const orderRoutes = require('./routes/orderRoutes');
-// const adminRoutes = require('./routes/adminRoutes');
+const productRoutes = require('./routes/productRoutes');
+const wishlistRoutes = require('./routes/wishlistRoutes');
+const voucherRoutes = require('./routes/voucherRoutes');
+const orderRoutes = require('./routes/orderRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+// TODO: Convert payment/admin-settings/report routes from MSSQL to PostgreSQL
+// const paymentRoutes = require('./routes/paymentRoutes');
+// const adminSettingsRoutes = require('./routes/adminSettingsRoutes');
+// const reportRoutes = require('./routes/reportRoutes');
 // TODO: Convert to PostgreSQL - temporarily disabled
 // const paymentRoutes = require('./routes/paymentRoutes');
 // const adminSettingsRoutes = require('./routes/adminSettingsRoutes');
@@ -36,11 +40,15 @@ app.get('/', (req, res) => {
 
 // API Routes Mounting
 app.use('/api/auth', authRoutes);
-// app.use('/api/products', productRoutes);
-// app.use('/api/wishlist', wishlistRoutes);
-// app.use('/api/vouchers', voucherRoutes);
-// app.use('/api/orders', orderRoutes);
-// app.use('/api/admin', adminRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/wishlist', wishlistRoutes);
+app.use('/api/vouchers', voucherRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/admin', adminRoutes);
+// TODO: Convert payment/admin-settings/report controllers from MSSQL to PostgreSQL
+// app.use('/api/payment', paymentRoutes);
+// app.use('/api/settings', adminSettingsRoutes);
+// app.use('/api/reports', reportRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
