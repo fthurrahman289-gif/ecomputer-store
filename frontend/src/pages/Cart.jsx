@@ -8,57 +8,8 @@ const Cart = () => {
   const { cart, updateCartQuantity, removeFromCart, getCartTotal, user } = useContext(AppContext);
   const navigate = useNavigate();
 
-  // Voucher state
-  const [voucherCode, setVoucherCode] = useState('');
-  const [activeVoucher, setActiveVoucher] = useState(null);
-  const [voucherError, setVoucherError] = useState('');
-  const [voucherSuccess, setVoucherSuccess] = useState('');
-
   const cartTotal = getCartTotal();
-
-  const handleApplyVoucher = async (e) => {
-    e.preventDefault();
-    setVoucherError('');
-    setVoucherSuccess('');
-
-    if (!voucherCode.trim()) return;
-
-    try {
-      const result = await apiCall('/api/vouchers/validate', {
-        method: 'POST',
-        body: JSON.stringify({
-          code: voucherCode.trim(),
-          purchaseAmount: cartTotal
-        })
-      });
-
-      setActiveVoucher(result.voucher);
-      setVoucherSuccess(result.message);
-    } catch (err) {
-      setActiveVoucher(null);
-      setVoucherError(err.message || 'Voucher tidak dapat digunakan.');
-    }
-  };
-
-  const removeVoucher = () => {
-    setActiveVoucher(null);
-    setVoucherCode('');
-    setVoucherSuccess('');
-    setVoucherError('');
-  };
-
-  // Discount calculation
-  let discountAmount = 0;
-  if (activeVoucher) {
-    if (activeVoucher.discount_percent > 0) {
-      discountAmount = cartTotal * (activeVoucher.discount_percent / 100);
-    } else {
-      discountAmount = parseFloat(activeVoucher.discount_amount);
-    }
-    if (discountAmount > cartTotal) discountAmount = cartTotal;
-  }
-
-  const netTotal = cartTotal - discountAmount;
+  const netTotal = cartTotal;
 
   const handleCheckoutRedirect = () => {
     if (!user) {
@@ -67,12 +18,10 @@ const Cart = () => {
       return;
     }
     
-    // Pass cart totals and voucher code to checkout state
+    // Pass cart totals to checkout state
     navigate('/checkout', {
       state: {
-        voucherCode: activeVoucher ? activeVoucher.code : null,
-        discountAmount,
-        netTotal
+        cartTotal
       }
     });
   };
@@ -110,8 +59,22 @@ const Cart = () => {
                 
                 {/* Visual Image representation */}
                 <div class="flex items-center space-x-4 w-full sm:w-auto">
-                  <div class="w-16 h-16 bg-slate-50 rounded-xl flex items-center justify-center text-4xl shrink-0 border border-slate-100">
-                    {product.category_id === 1 ? '💻' : product.category_id === 2 ? '🖥️' : product.category_id === 3 ? '⚙️' : '⌨️'}
+                  <div class="relative w-16 h-16 bg-slate-50 rounded-xl overflow-hidden flex items-center justify-center text-4xl shrink-0 border border-slate-100">
+                    {product.image_urls && product.image_urls.length > 0 ? (
+                      <img 
+                        src={product.image_urls[0]} 
+                        alt={product.name} 
+                        class="absolute inset-0 w-full h-full object-contain p-1"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          const fb = e.target.parentNode.querySelector('.emoji-fallback');
+                          if (fb) fb.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
+                    <div class="emoji-fallback absolute inset-0 flex items-center justify-center text-3xl" style={{ display: product.image_urls && product.image_urls.length > 0 ? 'none' : 'flex' }}>
+                      {product.category_id === 1 ? '💻' : product.category_id === 2 ? '🖥️' : product.category_id === 3 ? '⚙️' : '⌨️'}
+                    </div>
                   </div>
                   <div>
                     <h3 class="text-slate-800 font-bold text-sm line-clamp-1">{product.name}</h3>
@@ -165,59 +128,6 @@ const Cart = () => {
         {/* ORDER SUMMARY & VOUCHERS (Right Column) */}
         <div class="space-y-6">
           
-          {/* Voucher promo card */}
-          <div class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-4">
-            <h3 class="font-extrabold text-slate-800 text-sm flex items-center space-x-2">
-              <Ticket size={18} class="text-indigo-500" />
-              <span>Kode Voucher Promo</span>
-            </h3>
-
-            {activeVoucher ? (
-              <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-4 flex items-center justify-between text-emerald-800">
-                <div class="text-xs">
-                  <span class="font-extrabold block">Voucher Terpasang:</span>
-                  <span class="font-mono bg-emerald-100 text-emerald-900 px-2 py-0.5 rounded font-bold text-xs uppercase">{activeVoucher.code}</span>
-                  <span class="block mt-1">Diskon: {activeVoucher.discount_percent > 0 ? `${activeVoucher.discount_percent}%` : `Rp ${parseFloat(activeVoucher.discount_amount).toLocaleString('id-ID')}`}</span>
-                </div>
-                <button 
-                  onClick={removeVoucher}
-                  class="text-xs font-bold text-rose-600 hover:text-rose-700 bg-white border border-rose-100 px-2 py-1 rounded"
-                >
-                  Batal
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleApplyVoucher} class="flex space-x-2">
-                <input 
-                  type="text" 
-                  placeholder="Contoh: NEWUSER10" 
-                  value={voucherCode}
-                  onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-                  class="flex-grow bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
-                />
-                <button 
-                  type="submit"
-                  class="bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs px-4 py-2 rounded-xl"
-                >
-                  Pakai
-                </button>
-              </form>
-            )}
-
-            {voucherError && (
-              <div class="bg-rose-50 border-l-3 border-rose-500 p-2.5 rounded text-rose-700 text-xs flex items-center space-x-2">
-                <AlertCircle size={14} class="shrink-0" />
-                <span>{voucherError}</span>
-              </div>
-            )}
-
-            {voucherSuccess && (
-              <div class="bg-emerald-50 border-l-3 border-emerald-500 p-2.5 rounded text-emerald-700 text-xs flex items-center space-x-2">
-                <CheckCircle2 size={14} class="shrink-0" />
-                <span>{voucherSuccess}</span>
-              </div>
-            )}
-          </div>
 
           {/* Pricing summary card */}
           <div class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-4">
@@ -232,12 +142,6 @@ const Cart = () => {
                 <span>Total Harga Produk</span>
                 <span class="font-bold text-slate-800">Rp {cartTotal.toLocaleString('id-ID')}</span>
               </div>
-              {discountAmount > 0 && (
-                <div class="flex justify-between text-rose-600">
-                  <span>Diskon Voucher</span>
-                  <span>- Rp {discountAmount.toLocaleString('id-ID')}</span>
-                </div>
-              )}
             </div>
 
             <div class="flex justify-between items-center">

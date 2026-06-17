@@ -45,10 +45,27 @@ const autoCancelOrders = async (pool) => {
 
 // Checkout & Create Order (Transaction Safe)
 const checkout = async (req, res) => {
-  const { items, voucherCode, address, phone, paymentMethod } = req.body;
+  const { items, voucherCode, address, phone, paymentMethod, shippingMethod, customerName } = req.body;
 
   if (!items || items.length === 0 || !address || !phone || !paymentMethod) {
     return res.status(400).json({ message: 'Item keranjang, alamat, no telepon, dan metode pembayaran wajib diisi' });
+  }
+
+  const isAdmin = req.user && req.user.role === 'admin';
+  let userId = req.user.id;
+
+  const allowedShippingMethods = ['Pengiriman', 'Ambil di Toko'];
+  if (isAdmin) {
+    allowedShippingMethods.push('Pembelian di Toko');
+  }
+  const finalShippingMethod = allowedShippingMethods.includes(shippingMethod) ? shippingMethod : 'Pengiriman';
+
+  const allowedPaymentMethods = ['Transfer Bank', 'E-Wallet', 'QRIS'];
+  if (isAdmin && finalShippingMethod === 'Pembelian di Toko') {
+    allowedPaymentMethods.push('Tunai');
+  }
+  if (!allowedPaymentMethods.includes(paymentMethod)) {
+    return res.status(400).json({ message: 'Metode pembayaran tidak valid' });
   }
 
   try {
@@ -57,6 +74,22 @@ const checkout = async (req, res) => {
     await transaction.begin();
 
     try {
+      if (isAdmin && shippingMethod === 'Pembelian di Toko' && customerName) {
+        const dummyEmail = `offline_${Date.now()}@ecomputer.com`;
+        const userRes = await transaction.request()
+          .input('name', sql.NVarChar, customerName)
+          .input('email', sql.VarChar, dummyEmail)
+          .input('password', sql.VarChar, 'offline')
+          .input('phone', sql.VarChar, phone)
+          .input('address', sql.NVarChar, 'Pembelian di Toko')
+          .query(`
+            INSERT INTO dbo.users (name, email, password, phone, address, role)
+            OUTPUT INSERTED.id
+            VALUES (@name, @email, @password, @phone, @address, 'customer')
+          `);
+        userId = userRes.recordset[0].id;
+      }
+
       let totalAmount = 0;
       const orderItems = [];
 
@@ -88,9 +121,10 @@ const checkout = async (req, res) => {
         });
       }
 
-      // Apply Voucher
+      // Apply Voucher (Only valid for online customer checkouts, not offline store purchases)
       let discountAmount = 0;
-      if (voucherCode) {
+      const isStorePurchase = finalShippingMethod === 'Pembelian di Toko';
+      if (voucherCode && !isStorePurchase) {
         const vRes = await transaction.request()
           .input('code', sql.VarChar, voucherCode)
           .query(`
@@ -112,14 +146,18 @@ const checkout = async (req, res) => {
       }
 
       const netAmount = totalAmount - discountAmount;
-      const orderDate = new Date();
-      // Set expiration to 2 hours from now
-      const expiredAt = new Date(orderDate.getTime() + (2 * 60 * 60 * 1000));
+      if (netAmount >= 40000000 && paymentMethod === 'E-Wallet') {
+        throw new Error('Metode pembayaran E-Wallet tidak didukung untuk transaksi senilai Rp 40.000.000 atau lebih. Silakan gunakan Transfer Bank.');
+      }
 
-      // Insert Order
+      const orderDate = new Date();
+      // Set expiration to 2 hours from now for response metadata
+      const expiredAt = new Date(orderDate.getTime() + (2 * 60 * 60 * 1000));
+      const initialStatus = isStorePurchase ? 'Selesai' : 'Menunggu Pembayaran';
+
+      // Insert Order using GETDATE() and DATEADD(hour, 2, GETDATE()) to avoid Node/SQL Server timezone mismatches
       const insertOrderRes = await transaction.request()
-        .input('userId', sql.Int, req.user.id)
-        .input('orderDate', sql.DateTime, orderDate)
+        .input('userId', sql.Int, userId)
         .input('totalAmount', sql.Decimal, totalAmount)
         .input('discountAmount', sql.Decimal, discountAmount)
         .input('netAmount', sql.Decimal, netAmount)
@@ -127,13 +165,16 @@ const checkout = async (req, res) => {
         .input('address', sql.NVarChar, address)
         .input('phone', sql.VarChar, phone)
         .input('paymentMethod', sql.VarChar, paymentMethod)
-        .input('expiredAt', sql.DateTime, expiredAt)
+        .input('shippingMethod', sql.VarChar, finalShippingMethod)
+        .input('status', sql.VarChar, initialStatus)
         .query(`
           INSERT INTO dbo.orders 
-          (user_id, order_date, total_amount, discount_amount, net_amount, voucher_code, address, phone, payment_method, expired_at, status)
+          (user_id, order_date, total_amount, discount_amount, net_amount, voucher_code, address, phone, payment_method, expired_at, status, shipping_method)
           OUTPUT INSERTED.id
           VALUES 
-          (@userId, @orderDate, @totalAmount, @discountAmount, @netAmount, @voucherCode, @address, @phone, @paymentMethod, @expiredAt, 'Menunggu Pembayaran')
+          (@userId, GETDATE(), @totalAmount, @discountAmount, @netAmount, @voucherCode, @address, @phone, @paymentMethod, 
+           ${isStorePurchase ? 'GETDATE()' : 'DATEADD(hour, 2, GETDATE())'}, 
+           @status, @shippingMethod)
         `);
 
       const orderId = insertOrderRes.recordset[0].id;
@@ -158,7 +199,7 @@ const checkout = async (req, res) => {
 
       await transaction.commit();
       res.status(201).json({
-        message: 'Order berhasil dibuat',
+        message: isStorePurchase ? 'Order pembelian di toko berhasil dicatat' : 'Order berhasil dibuat',
         orderId,
         netAmount,
         expiredAt,
@@ -176,7 +217,7 @@ const checkout = async (req, res) => {
     }
   } catch (error) {
     console.error('Checkout error:', error);
-    res.status(500).json({ message: 'Terjadi kesalahan saat memproses checkout', error: error.message });
+    res.status(500).json({ message: error.message || 'Terjadi kesalahan saat memproses checkout' });
   }
 };
 
@@ -360,7 +401,7 @@ const adminUpdateOrderStatus = async (req, res) => {
   const { id } = req.params;
   const { status } = req.body; // 'Diproses', 'Dikirim', 'Selesai', 'Dibatalkan'
 
-  const allowedStatuses = ['Menunggu Pembayaran', 'Menunggu Verifikasi', 'Diproses', 'Dikirim', 'Selesai', 'Dibatalkan'];
+  const allowedStatuses = ['Menunggu Pembayaran', 'Menunggu Verifikasi', 'Diproses', 'Dikirim', 'Menunggu di Ambil', 'Sudah di Ambil', 'Selesai', 'Dibatalkan'];
   if (!allowedStatuses.includes(status)) {
     return res.status(400).json({ message: 'Status tidak valid' });
   }
@@ -396,17 +437,25 @@ const adminVerifyPayment = async (req, res) => {
   try {
     const pool = await poolPromise;
 
-    // Get payment proof details
+    // Get payment proof details and order shipping method
     const payRes = await pool.request()
       .input('paymentId', sql.Int, paymentId)
-      .query('SELECT * FROM dbo.payments WHERE id = @paymentId');
+      .query(`
+        SELECT p.*, o.shipping_method 
+        FROM dbo.payments p
+        JOIN dbo.orders o ON p.order_id = o.id
+        WHERE p.id = @paymentId
+      `);
 
     if (payRes.recordset.length === 0) {
       return res.status(404).json({ message: 'Bukti pembayaran tidak ditemukan' });
     }
 
     const payment = payRes.recordset[0];
-    const newOrderStatus = approvalStatus === 'Disetujui' ? 'Diproses' : 'Menunggu Pembayaran';
+    let newOrderStatus = 'Menunggu Pembayaran';
+    if (approvalStatus === 'Disetujui') {
+      newOrderStatus = payment.shipping_method === 'Ambil di Toko' ? 'Menunggu di Ambil' : 'Diproses';
+    }
 
     const transaction = new sql.Transaction(pool);
     await transaction.begin();
@@ -441,6 +490,105 @@ const adminVerifyPayment = async (req, res) => {
   }
 };
 
+// Admin: Create in-store purchase order directly (POS Style)
+const adminCreateOrder = async (req, res) => {
+  const { userId, items, paymentMethod, phone, address } = req.body;
+
+  if (!userId || !items || items.length === 0 || !phone || !paymentMethod) {
+    return res.status(400).json({ message: 'User ID, item, no telepon, dan metode pembayaran wajib diisi' });
+  }
+
+  try {
+    const pool = await poolPromise;
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
+
+    try {
+      let totalAmount = 0;
+      const orderItems = [];
+
+      // Validate stock & calculate price
+      for (const item of items) {
+        const prodRes = await transaction.request()
+          .input('pid', sql.Int, item.productId)
+          .query('SELECT * FROM dbo.products WHERE id = @pid');
+
+        if (prodRes.recordset.length === 0) {
+          throw new Error(`Produk dengan ID ${item.productId} tidak ditemukan`);
+        }
+
+        const product = prodRes.recordset[0];
+        if (product.stock < item.quantity) {
+          throw new Error(`Stok produk "${product.name}" tidak mencukupi (Tersedia: ${product.stock}, Diminta: ${item.quantity})`);
+        }
+
+        const activePrice = product.price * (1 - (product.discount_percent / 100));
+        const itemSubtotal = activePrice * item.quantity;
+        totalAmount += itemSubtotal;
+
+        orderItems.push({
+          productId: product.id,
+          quantity: item.quantity,
+          price: activePrice,
+          newStock: product.stock - item.quantity
+        });
+      }
+
+      const netAmount = totalAmount;
+
+      // Insert Order directly with 'Selesai' status and 'Pembelian di Toko' shipping method
+      const insertOrderRes = await transaction.request()
+        .input('userId', sql.Int, userId)
+        .input('totalAmount', sql.Decimal, totalAmount)
+        .input('discountAmount', sql.Decimal, 0)
+        .input('netAmount', sql.Decimal, netAmount)
+        .input('address', sql.NVarChar, address || 'Pembelian di Toko')
+        .input('phone', sql.VarChar, phone)
+        .input('paymentMethod', sql.VarChar, paymentMethod)
+        .query(`
+          INSERT INTO dbo.orders 
+          (user_id, order_date, total_amount, discount_amount, net_amount, voucher_code, address, phone, payment_method, expired_at, status, shipping_method)
+          OUTPUT INSERTED.id
+          VALUES 
+          (@userId, GETDATE(), @totalAmount, @discountAmount, @netAmount, NULL, @address, @phone, @paymentMethod, GETDATE(), 'Selesai', 'Pembelian di Toko')
+        `);
+
+      const orderId = insertOrderRes.recordset[0].id;
+
+      // Insert Order Details & Update Product Stock
+      for (const item of orderItems) {
+        await transaction.request()
+          .input('orderId', sql.Int, orderId)
+          .input('productId', sql.Int, item.productId)
+          .input('quantity', sql.Int, item.quantity)
+          .input('price', sql.Decimal, item.price)
+          .query(`
+            INSERT INTO dbo.order_details (order_id, product_id, quantity, price)
+            VALUES (@orderId, @productId, @quantity, @price)
+          `);
+
+        await transaction.request()
+          .input('productId', sql.Int, item.productId)
+          .input('newStock', sql.Int, item.newStock)
+          .query('UPDATE dbo.products SET stock = @newStock WHERE id = @productId');
+      }
+
+      await transaction.commit();
+      res.status(201).json({
+        message: 'Order pembelian di toko berhasil dibuat',
+        orderId,
+        netAmount
+      });
+    } catch (err) {
+      await transaction.rollback();
+      throw err;
+    }
+  } catch (error) {
+    console.error('Admin create order error:', error);
+    res.status(500).json({ message: 'Terjadi kesalahan saat memproses pembelian di toko', error: error.message });
+  }
+};
+
 module.exports = {
   checkout,
   getMyOrders,
@@ -448,5 +596,7 @@ module.exports = {
   uploadPaymentProof,
   adminGetOrders,
   adminUpdateOrderStatus,
-  adminVerifyPayment
+  adminVerifyPayment,
+  adminCreateOrder
 };
+

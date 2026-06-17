@@ -45,10 +45,10 @@ export const AppProvider = ({ children }) => {
   }, [user, token]);
 
   // --- AUTH OPERATIONS ---
-  const login = async (email, password) => {
+  const login = async (username, password) => {
     const data = await apiCall('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ username, password })
     });
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
@@ -57,10 +57,10 @@ export const AppProvider = ({ children }) => {
     return data.user;
   };
 
-  const register = async (name, email, password, phone, address) => {
+  const register = async (name, username, email, password, phone, address) => {
     return await apiCall('/api/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ name, email, password, phone, address })
+      body: JSON.stringify({ name, username, email, password, phone, address })
     });
   };
 

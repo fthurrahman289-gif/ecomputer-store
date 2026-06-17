@@ -15,8 +15,15 @@ import {
   X, 
   Eye, 
   DollarSign,
-  AlertCircle
+  AlertCircle,
+  Upload,
+  Image,
+  Loader2,
+  Printer,
+  Settings
 } from 'lucide-react';
+import ProductImageUploader from '../components/ProductImageUploader';
+import AdminReports from './AdminReports';
 
 const AdminDashboard = () => {
   const { user, token } = useContext(AppContext);
@@ -44,7 +51,7 @@ const AdminDashboard = () => {
   const [selectedProd, setSelectedProd] = useState(null);
   const [prodForm, setProdForm] = useState({
     category_id: '', name: '', brand: '', price: '', stock: '', description: '',
-    image_urls: '["/images/products/placeholder.jpg"]', spec_ram: '', spec_storage: '',
+    images: [], spec_ram: '', spec_storage: '',
     spec_cpu: '', spec_gpu: '', weight: '', is_best_seller: false, is_new: true, discount_percent: '0'
   });
 
@@ -159,7 +166,7 @@ const AdminDashboard = () => {
     setProdForm({
       category_id: categories.length > 0 ? categories[0].id : '',
       name: '', brand: '', price: '', stock: '', description: '',
-      image_urls: '["/images/products/placeholder.jpg"]', spec_ram: '', spec_storage: '',
+      images: [], spec_ram: '', spec_storage: '',
       spec_cpu: '', spec_gpu: '', weight: '', is_best_seller: false, is_new: true, discount_percent: '0'
     });
     setIsProdModalOpen(true);
@@ -174,7 +181,7 @@ const AdminDashboard = () => {
       price: prod.price,
       stock: prod.stock,
       description: prod.description || '',
-      image_urls: JSON.stringify(prod.image_urls),
+      images: Array.isArray(prod.image_urls) ? prod.image_urls : (typeof prod.image_urls === 'string' ? JSON.parse(prod.image_urls) : []),
       spec_ram: prod.spec_ram || '',
       spec_storage: prod.spec_storage || '',
       spec_cpu: prod.spec_cpu || '',
@@ -190,18 +197,28 @@ const AdminDashboard = () => {
   const handleSaveProd = async (e) => {
     e.preventDefault();
     try {
+      if (prodForm.images.length === 0) {
+        alert('Minimal satu gambar produk harus diunggah');
+        return;
+      }
+
+      const payload = {
+        ...prodForm,
+        image_urls: prodForm.images  // Send as array
+      };
+
       if (selectedProd) {
         // Edit Mode
         const data = await apiCall(`/api/products/${selectedProd.id}`, {
           method: 'PUT',
-          body: JSON.stringify(prodForm)
+          body: JSON.stringify(payload)
         });
         triggerAlert(data.message);
       } else {
         // Add Mode
         const data = await apiCall('/api/products', {
           method: 'POST',
-          body: JSON.stringify(prodForm)
+          body: JSON.stringify(payload)
         });
         triggerAlert(data.message);
       }
@@ -351,7 +368,7 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div class="min-h-screen flex flex-col md:flex-row bg-slate-100">
+    <div className="min-h-screen flex flex-col md:flex-row bg-slate-100">
       
       {/* SIDEBAR NAVIGATION */}
       <aside class="w-full md:w-64 bg-slate-900 text-slate-300 flex flex-col shrink-0">
@@ -366,7 +383,8 @@ const AdminDashboard = () => {
             { id: 'products', label: 'Kelola Produk', icon: <Package size={18} /> },
             { id: 'orders', label: 'Kelola Order', icon: <ShoppingBag size={18} /> },
             { id: 'vouchers', label: 'Kelola Voucher', icon: <Ticket size={18} /> },
-            { id: 'users', label: 'Kelola User', icon: <Users size={18} /> }
+            { id: 'users', label: 'Kelola User', icon: <Users size={18} /> },
+            { id: 'reports', label: 'Laporan Penjualan', icon: <Printer size={18} /> }
           ].map((tab) => (
             <button
               key={tab.id}
@@ -381,12 +399,12 @@ const AdminDashboard = () => {
       </aside>
 
       {/* MAIN VIEW AREA */}
-      <main class="flex-grow p-6 sm:p-10 space-y-8 overflow-x-auto">
+      <main className="flex-grow p-6 sm:p-10 space-y-8 overflow-x-auto">
         
         {/* Banner Alert Notification */}
         {alertMsg && (
-          <div class="fixed top-20 right-6 bg-slate-900 border-l-4 border-emerald-500 text-white font-bold p-4 rounded shadow-2xl z-50 flex items-center space-x-2 animate-fade-in text-xs">
-            <Check size={16} class="text-emerald-500 shrink-0" />
+          <div className="fixed top-20 right-6 bg-slate-900 border-l-4 border-emerald-500 text-white font-bold p-4 rounded shadow-2xl z-50 flex items-center space-x-2 animate-fade-in text-xs">
+            <Check size={16} className="text-emerald-500 shrink-0" />
             <span>{alertMsg}</span>
           </div>
         )}
@@ -785,6 +803,10 @@ const AdminDashboard = () => {
           </div>
         )}
 
+        {activeTab === 'reports' && (
+          <AdminReports />
+        )}
+
       </main>
 
       {/* ========================================================
@@ -859,9 +881,11 @@ const AdminDashboard = () => {
                 <input type="number" step="0.01" value={prodForm.weight} onChange={(e) => setProdForm({...prodForm, weight: e.target.value})} class="w-full bg-slate-50 border p-2.5 rounded-xl focus:outline-none" />
               </div>
 
-              <div>
-                <label class="block font-semibold text-slate-500 mb-1">URL Gambar (JSON Array)</label>
-                <input type="text" value={prodForm.image_urls} onChange={(e) => setProdForm({...prodForm, image_urls: e.target.value})} class="w-full bg-slate-50 border p-2.5 rounded-xl focus:outline-none font-mono text-[10px]" />
+              <div class="sm:col-span-2">
+                <ProductImageUploader 
+                  images={prodForm.images}
+                  onImagesChange={(newImages) => setProdForm({...prodForm, images: newImages})}
+                />
               </div>
 
               <div class="sm:col-span-2">

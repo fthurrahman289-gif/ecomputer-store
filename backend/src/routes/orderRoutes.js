@@ -7,7 +7,8 @@ const {
   uploadPaymentProof,
   adminGetOrders,
   adminUpdateOrderStatus,
-  adminVerifyPayment
+  adminVerifyPayment,
+  adminCreateOrder
 } = require('../controllers/orderController');
 const { protect, adminOnly } = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadMiddleware');
@@ -22,5 +23,7 @@ router.get('/:id', protect, getOrderById);
 router.get('/admin/orders', protect, adminOnly, adminGetOrders);
 router.put('/admin/orders/:id/status', protect, adminOnly, adminUpdateOrderStatus);
 router.post('/admin/payments/:paymentId/verify', protect, adminOnly, adminVerifyPayment);
+router.post('/admin/create-order', protect, adminOnly, adminCreateOrder);
 
 module.exports = router;
+

@@ -3,6 +3,8 @@
 -- =======================================================
 
 -- 1. DROP TABLES IN REVERSE ORDER OF DEPENDENCY (If Exist)
+IF OBJECT_ID('dbo.admin_settings', 'U') IS NOT NULL DROP TABLE dbo.admin_settings;
+IF OBJECT_ID('dbo.payment_settings', 'U') IS NOT NULL DROP TABLE dbo.payment_settings;
 IF OBJECT_ID('dbo.payments', 'U') IS NOT NULL DROP TABLE dbo.payments;
 IF OBJECT_ID('dbo.wishlist', 'U') IS NOT NULL DROP TABLE dbo.wishlist;
 IF OBJECT_ID('dbo.order_details', 'U') IS NOT NULL DROP TABLE dbo.order_details;
@@ -65,7 +67,8 @@ CREATE TABLE dbo.vouchers (
     min_purchase DECIMAL(18,2) NOT NULL DEFAULT 0,
     start_date DATETIME NOT NULL,
     end_date DATETIME NOT NULL,
-    is_active BIT NOT NULL DEFAULT 1
+    is_active BIT NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT GETDATE()
 );
 
 -- Table: orders
@@ -82,6 +85,7 @@ CREATE TABLE dbo.orders (
     phone VARCHAR(20) NOT NULL,
     payment_method VARCHAR(50) NOT NULL, -- 'Transfer Bank', 'E-Wallet'
     expired_at DATETIME NOT NULL,         -- order automatically expires and cancels if unpaid
+    shipping_method VARCHAR(50) NOT NULL DEFAULT 'Pengiriman', -- 'Pengiriman', 'Ambil di Toko', 'Pembelian di Toko'
     CONSTRAINT FK_orders_users FOREIGN KEY (user_id) REFERENCES dbo.users(id) ON DELETE CASCADE
 );
 
@@ -121,17 +125,43 @@ CREATE TABLE dbo.payments (
     CONSTRAINT FK_payments_users FOREIGN KEY (verified_by) REFERENCES dbo.users(id)
 );
 
+-- Table: payment_settings
+CREATE TABLE dbo.payment_settings (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    payment_method VARCHAR(50) NOT NULL UNIQUE, -- 'QRIS', 'Bank Transfer', 'E-Wallet'
+    bank_name NVARCHAR(100) NULL,
+    account_number VARCHAR(50) NULL,
+    account_holder_name NVARCHAR(100) NULL,
+    whatsapp_number VARCHAR(20) NULL,
+    qris_image_path NVARCHAR(MAX) NULL, -- Path to QRIS image
+    ovo_number VARCHAR(50) NULL, -- OVO phone number or account
+    gopay_number VARCHAR(50) NULL, -- GoPay phone number or account
+    is_active BIT NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT GETDATE(),
+    updated_at DATETIME NOT NULL DEFAULT GETDATE()
+);
+
+-- Table: admin_settings
+CREATE TABLE dbo.admin_settings (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    setting_key VARCHAR(100) NOT NULL UNIQUE, -- 'cs_whatsapp', 'cs_email', 'admin_phone', 'store_address', 'store_hours'
+    setting_value NVARCHAR(MAX) NOT NULL,
+    description NVARCHAR(500) NULL,
+    created_at DATETIME NOT NULL DEFAULT GETDATE(),
+    updated_at DATETIME NOT NULL DEFAULT GETDATE()
+);
+
 -- =======================================================
 -- 3. SEED DUMMY DATA
 -- =======================================================
 
 -- Seed Users:
 -- Admin password: 'adminpassword' -> bcrypt: $2b$10$k1wXbN3K5e2c5w0gI1e0DuB0X7y7K2U7.h97/FfKz0o9W2vU5n.yq
--- Customer password: 'customerpassword' -> bcrypt: $2b$10$K4rB3L9C7h8D2tY3s9f0GuI1j2K3L4M5N6O7P8Q9R0S1T2U3V4W5X
+-- Customer password: 'customerpassword' -> bcrypt: $2a$10$k0mpBf8NoXBMUOIJw8Hlk.7Tmq9m3JZtOM.O0RpiY5k1acqiXVzD.
 INSERT INTO dbo.users (name, email, password, phone, address, role) VALUES 
 (N'Admin E-Computer', 'admin@ecomputer.com', '$2b$10$k1wXbN3K5e2c5w0gI1e0DuB0X7y7K2U7.h97/FfKz0o9W2vU5n.yq', '081234567890', N'Ruko Cyber Mall Lantai 2, Jakarta', 'admin'),
-(N'Budi Setiawan', 'budi@gmail.com', '$2b$10$K4rB3L9C7h8D2tY3s9f0GuI1j2K3L4M5N6O7P8Q9R0S1T2U3V4W5X', '082198765432', N'Jl. Mangga Besar No. 45, Jakarta Barat', 'customer'),
-(N'Rian Hidayat', 'rian@gmail.com', '$2b$10$K4rB3L9C7h8D2tY3s9f0GuI1j2K3L4M5N6O7P8Q9R0S1T2U3V4W5X', '085712345678', N'Jl. Dago No. 12, Bandung', 'customer');
+(N'Budi Setiawan', 'budi@gmail.com', '$2a$10$k0mpBf8NoXBMUOIJw8Hlk.7Tmq9m3JZtOM.O0RpiY5k1acqiXVzD.', '082198765432', N'Jl. Mangga Besar No. 45, Jakarta Barat', 'customer'),
+(N'Rian Hidayat', 'rian@gmail.com', '$2a$10$k0mpBf8NoXBMUOIJw8Hlk.7Tmq9m3JZtOM.O0RpiY5k1acqiXVzD.', '085712345678', N'Jl. Dago No. 12, Bandung', 'customer');
 
 -- Seed Categories:
 INSERT INTO dbo.categories (name, slug, description) VALUES
@@ -158,3 +188,18 @@ INSERT INTO dbo.vouchers (code, discount_amount, discount_percent, min_purchase,
 ('NEWUSER10', 0.00, 10, 1500000.00, '2026-01-01 00:00:00', '2027-12-31 23:59:59', 1),
 ('GAJIANHEMAT', 150000.00, 0, 2000000.00, '2026-01-01 00:00:00', '2027-12-31 23:59:59', 1),
 ('ROGFREESHIP', 500000.00, 0, 25000000.00, '2026-01-01 00:00:00', '2027-12-31 23:59:59', 1);
+
+-- Seed Payment Settings:
+INSERT INTO dbo.payment_settings (payment_method, bank_name, account_number, account_holder_name, whatsapp_number, is_active) VALUES
+(N'Transfer Bank', N'BCA', N'1234567890', N'PT E-COMPUTER INDONESIA', N'081234567890', 1),
+(N'QRIS', NULL, NULL, NULL, N'081234567890', 1),
+(N'E-Wallet', NULL, NULL, NULL, N'081234567890', 1);
+-- Note: QRIS image will be uploaded via admin panel
+
+-- Seed Admin Settings:
+INSERT INTO dbo.admin_settings (setting_key, setting_value, description) VALUES
+(N'cs_whatsapp', N'6281234567890', N'Nomor WhatsApp Customer Service'),
+(N'cs_email', N'cs@ecomputer.com', N'Email Customer Service'),
+(N'admin_phone', N'081234567890', N'Nomor Telepon Admin'),
+(N'store_address', N'Ruko Cyber Mall Lantai 2, Jakarta', N'Alamat Toko Fisik'),
+(N'store_hours', N'Senin-Jumat: 10:00-18:00, Sabtu-Minggu: 11:00-17:00', N'Jam Operasional Toko');

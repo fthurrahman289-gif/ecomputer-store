@@ -1,30 +1,33 @@
-const sql = require('mssql');
 require('dotenv').config();
+const { Pool } = require('pg');
 
-const config = {
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  server: process.env.DB_SERVER,
-  database: process.env.DB_DATABASE,
-  port: parseInt(process.env.DB_PORT, 10) || 1433,
-  options: {
-    encrypt: process.env.DB_ENCRYPT === 'true',
-    trustServerCertificate: process.env.DB_TRUST_SERVER_CERTIFICATE === 'true'
-  }
+// PostgreSQL connection pool for Supabase
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL || `postgresql://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_SERVER}:${process.env.DB_PORT || 5432}/${process.env.DB_DATABASE}`,
+  ssl: process.env.DB_SSL !== 'false' ? { rejectUnauthorized: false } : false,
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+});
+
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle client', err);
+  process.exit(-1);
+});
+
+pool.on('connect', () => {
+  console.log('Connected to PostgreSQL Database: ' + process.env.DB_DATABASE);
+});
+
+const poolPromise = Promise.resolve(pool);
+
+// Query helper function
+const query = (text, params) => {
+  return pool.query(text, params);
 };
 
-const poolPromise = new sql.ConnectionPool(config)
-  .connect()
-  .then(pool => {
-    console.log('Connected to SQL Server Database: ' + process.env.DB_DATABASE);
-    return pool;
-  })
-  .catch(err => {
-    console.error('Database Connection Failed! Error: ', err);
-    process.exit(1);
-  });
-
 module.exports = {
-  sql,
-  poolPromise
+  pool,
+  poolPromise,
+  query
 };

@@ -56,8 +56,22 @@ const Compare = () => {
                     <X size={16} />
                   </button>
                   <div class="flex flex-col items-center text-center space-y-3 pt-4">
-                    <div class="w-16 h-16 bg-slate-50 rounded-xl flex items-center justify-center text-4xl border border-slate-100">
-                      {prod.category_id === 1 ? '💻' : '⚙️'}
+                    <div class="relative w-16 h-16 bg-slate-50 rounded-xl overflow-hidden flex items-center justify-center text-4xl border border-slate-100">
+                      {prod.image_urls && prod.image_urls.length > 0 ? (
+                        <img 
+                          src={prod.image_urls[0]} 
+                          alt={prod.name} 
+                          class="absolute inset-0 w-full h-full object-contain p-1"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            const fb = e.target.parentNode.querySelector('.emoji-fallback');
+                            if (fb) fb.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <div class="emoji-fallback absolute inset-0 flex items-center justify-center" style={{ display: prod.image_urls && prod.image_urls.length > 0 ? 'none' : 'flex' }}>
+                        {prod.category_id === 1 ? '💻' : '⚙️'}
+                      </div>
                     </div>
                     <div>
                       <span class="text-[10px] uppercase font-bold text-slate-400">{prod.brand}</span>

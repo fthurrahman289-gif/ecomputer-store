@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
+import LiveChatButton from './components/LiveChatButton';
 
 // Pages Import
 import Home from './pages/Home';
@@ -15,15 +16,17 @@ import Compare from './pages/Compare';
 import Wishlist from './pages/Wishlist';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminReports from './pages/AdminReports';
 
 function App() {
   return (
     <AppProvider>
       <Router>
-        <div class="flex flex-col min-h-screen font-sans bg-slate-50 text-slate-900 selection:bg-brand-500 selection:text-white">
+        <div className="flex flex-col min-h-screen font-sans bg-slate-50 text-slate-900 selection:bg-brand-500 selection:text-white">
           <Navbar />
-          <main class="flex-grow">
+          <main className="flex-grow">
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/catalog" element={<Catalog />} />
@@ -35,10 +38,13 @@ function App() {
               <Route path="/wishlist" element={<Wishlist />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/admin/*" element={<AdminDashboard />} />
+              <Route path="/admin-reports" element={<AdminReports />} />
             </Routes>
           </main>
           <Footer />
+          <LiveChatButton />
         </div>
       </Router>
     </AppProvider>

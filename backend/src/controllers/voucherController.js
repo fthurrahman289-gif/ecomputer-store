@@ -4,7 +4,7 @@ const { poolPromise, sql } = require('../config/db');
 const getVouchers = async (req, res) => {
   try {
     const pool = await poolPromise;
-    let query = 'SELECT * FROM dbo.vouchers ORDER BY created_at DESC';
+    let query = 'SELECT * FROM dbo.vouchers ORDER BY id DESC';
 
     // If request has no user or user is customer, return only active and valid vouchers
     if (!req.user || req.user.role !== 'admin') {

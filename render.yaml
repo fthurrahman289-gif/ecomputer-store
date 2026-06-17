@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: penjualan-komputer-backend
+    env: node
+    plan: free
+    region: oregon
+    branch: main
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start

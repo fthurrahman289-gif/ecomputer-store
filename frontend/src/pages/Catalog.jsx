@@ -62,7 +62,27 @@ const Catalog = () => {
       if (searchParams.get('isBestSeller')) queryParams.append('isBestSeller', 'true');
 
       const data = await apiCall(`/api/products?${queryParams.toString()}`);
-      setProducts(data);
+      
+      // Parse image_urls for all products
+      const parsedProducts = data.map(product => {
+        if (product.image_urls) {
+          if (typeof product.image_urls === 'string') {
+            try {
+              product.image_urls = JSON.parse(product.image_urls);
+            } catch (e) {
+              product.image_urls = [product.image_urls];
+            }
+          }
+          if (!Array.isArray(product.image_urls)) {
+            product.image_urls = [product.image_urls];
+          }
+        } else {
+          product.image_urls = [];
+        }
+        return product;
+      });
+      
+      setProducts(parsedProducts);
     } catch (error) {
       console.error('Failed to load products', error);
     } finally {
@@ -304,13 +324,34 @@ const Catalog = () => {
                     
                     {/* Image Area */}
                     <div class="relative pt-[70%] bg-slate-50 overflow-hidden flex items-center justify-center">
-                      <div class="absolute inset-0 flex items-center justify-center text-5xl group-hover:scale-110 transition-transform duration-300">
-                        {product.category_id === 1 ? '💻' : product.category_id === 2 ? '🖥️' : product.category_id === 3 ? '⚙️' : '⌨️'}
-                      </div>
+                      <Link to={`/product/${product.id}`} class="absolute inset-0 z-0">
+                        {product.image_urls && product.image_urls.length > 0 ? (
+                          <img 
+                            src={product.image_urls[0]} 
+                            alt={product.name} 
+                            class={`absolute inset-0 w-full h-full object-contain p-4 group-hover:scale-110 transition-transform duration-300 ${product.stock === 0 ? 'grayscale opacity-60 blur-[2px]' : ''}`}
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              const fb = e.target.parentNode.querySelector('.emoji-fallback');
+                              if (fb) fb.style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        <div class={`emoji-fallback absolute inset-0 flex items-center justify-center text-5xl group-hover:scale-110 transition-transform duration-300 ${product.stock === 0 ? 'grayscale opacity-60 blur-[2px]' : ''}`} style={{ display: product.image_urls && product.image_urls.length > 0 ? 'none' : 'flex' }}>
+                          {product.category_id === 1 ? '💻' : product.category_id === 2 ? '🖥️' : product.category_id === 3 ? '⚙️' : '⌨️'}
+                        </div>
+                        
+                        {/* Overlay Habis */}
+                        {product.stock === 0 && (
+                          <div class="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+                            <span class="bg-black/80 text-white font-extrabold px-4 py-2 rounded-lg text-sm tracking-widest backdrop-blur-sm shadow-xl">STOK HABIS</span>
+                          </div>
+                        )}
+                      </Link>
                       
                       {/* Overlay badges */}
                       {product.discount_percent > 0 && (
-                        <span class="absolute top-3 left-3 bg-rose-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                        <span class="absolute top-3 left-3 bg-rose-500 text-white text-xs font-bold px-2 py-0.5 rounded-full z-10 pointer-events-none">
                           -{product.discount_percent}%
                         </span>
                       )}

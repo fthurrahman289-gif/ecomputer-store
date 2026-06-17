@@ -116,10 +116,31 @@ const Home = () => {
         {/* Badges and Actions */}
         <div class="relative pt-[75%] bg-slate-50 flex items-center justify-center overflow-hidden">
           
-          {/* Main Visual Placeholder Icon */}
-          <div class="absolute inset-0 flex items-center justify-center text-6xl group-hover:scale-110 transition-transform duration-300">
-            {product.category_id === 1 ? '💻' : product.category_id === 2 ? '🖥️' : product.category_id === 3 ? '⚙️' : '⌨️'}
-          </div>
+          {/* Main Visual Image */}
+          <Link to={`/product/${product.id}`} class="absolute inset-0 z-0">
+            {product.image_urls && product.image_urls.length > 0 ? (
+              <img 
+                src={product.image_urls[0]} 
+                alt={product.name} 
+                class={`absolute inset-0 w-full h-full object-contain p-4 group-hover:scale-110 transition-transform duration-300 ${product.stock === 0 ? 'grayscale opacity-60 blur-[2px]' : ''}`}
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  const fb = e.target.parentNode.querySelector('.emoji-fallback');
+                  if (fb) fb.style.display = 'flex';
+                }}
+              />
+            ) : null}
+            <div class={`emoji-fallback absolute inset-0 flex items-center justify-center text-6xl group-hover:scale-110 transition-transform duration-300 ${product.stock === 0 ? 'grayscale opacity-60 blur-[2px]' : ''}`} style={{ display: product.image_urls && product.image_urls.length > 0 ? 'none' : 'flex' }}>
+              {product.category_id === 1 ? '💻' : product.category_id === 2 ? '🖥️' : product.category_id === 3 ? '⚙️' : '⌨️'}
+            </div>
+            
+            {/* Overlay Habis */}
+            {product.stock === 0 && (
+              <div class="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+                <span class="bg-black/80 text-white font-extrabold px-3 py-1.5 rounded-lg text-xs tracking-widest backdrop-blur-sm shadow-xl">STOK HABIS</span>
+              </div>
+            )}
+          </Link>
 
           {/* Discount Badge */}
           {product.discount_percent > 0 && (
