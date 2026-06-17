@@ -3,8 +3,8 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
-// Route Imports - Temporarily disabled for debugging
-// const authRoutes = require('./routes/authRoutes');
+// Route Imports
+const authRoutes = require('./routes/authRoutes');
 // const productRoutes = require('./routes/productRoutes');
 // const wishlistRoutes = require('./routes/wishlistRoutes');
 // const voucherRoutes = require('./routes/voucherRoutes');
@@ -34,8 +34,8 @@ app.get('/', (req, res) => {
   });
 });
 
-// API Routes Mounting - Temporarily disabled for debugging
-// app.use('/api/auth', authRoutes);
+// API Routes Mounting
+app.use('/api/auth', authRoutes);
 // app.use('/api/products', productRoutes);
 // app.use('/api/wishlist', wishlistRoutes);
 // app.use('/api/vouchers', voucherRoutes);
