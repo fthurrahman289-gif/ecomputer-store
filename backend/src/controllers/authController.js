@@ -65,6 +65,15 @@ const loginUser = async (req, res) => {
   }
 
   try {
+    // Validate environment variables
+    if (!process.env.JWT_SECRET) {
+      console.error('❌ CRITICAL: JWT_SECRET environment variable not set');
+      return res.status(500).json({ 
+        message: 'Konfigurasi server tidak lengkap. Hubungi administrator.',
+        debug: 'Missing JWT_SECRET environment variable'
+      });
+    }
+
     // Find user by username or email
     const result = await query(
       'SELECT * FROM users WHERE username = $1 OR email = $1',
@@ -103,8 +112,24 @@ const loginUser = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ message: 'Terjadi kesalahan server saat login', error: error.message });
+    console.error('❌ Login Error Details:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
+    
+    // Check if it's a database connection error
+    if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
+      return res.status(503).json({ 
+        message: 'Database connection error. Coba lagi dalam beberapa saat.',
+        debug: error.code
+      });
+    }
+    
+    res.status(500).json({ 
+      message: 'Terjadi kesalahan server saat login',
+      error: error.message 
+    });
   }
 };
 

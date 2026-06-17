@@ -1,4 +1,6 @@
 // Base API URL helper uses Vite env variable for production and relative URL for local dev.
+// For Vercel: Use relative /api because frontend and backend are on same domain
+// For local dev: Use VITE_API_URL if set, otherwise use /api
 const API_URL = import.meta.env.VITE_API_URL || '';
 
 export const API_BASE_URL = API_URL;

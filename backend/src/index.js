@@ -19,6 +19,9 @@ const adminRoutes = require('./routes/adminRoutes');
 // const adminSettingsRoutes = require('./routes/adminSettingsRoutes');
 // const reportRoutes = require('./routes/reportRoutes');
 
+// Database connection
+const { pool } = require('./config/db');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -30,11 +33,35 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // Serve static directory for uploaded payment receipts
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+// Health check endpoint (used by Vercel)
+app.get('/health', async (req, res) => {
+  try {
+    // Test database connection
+    const result = await pool.query('SELECT 1');
+    res.status(200).json({
+      status: 'ok',
+      database: 'connected',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ Health check failed:', error.message);
+    res.status(503).json({
+      status: 'error',
+      database: 'disconnected',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Root endpoint check
 app.get('/', (req, res) => {
   res.json({
     message: 'Welcome to E-Computer E-Commerce REST API',
-    status: 'Running'
+    status: 'Running',
+    version: '2.0.0',
+    database: 'PostgreSQL',
+    timestamp: new Date().toISOString()
   });
 });
 
