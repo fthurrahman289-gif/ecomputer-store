@@ -10,9 +10,10 @@ const wishlistRoutes = require('./routes/wishlistRoutes');
 const voucherRoutes = require('./routes/voucherRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const adminRoutes = require('./routes/adminRoutes');
-const paymentRoutes = require('./routes/paymentRoutes');
-const adminSettingsRoutes = require('./routes/adminSettingsRoutes');
-const reportRoutes = require('./routes/reportRoutes');
+// TODO: Convert to PostgreSQL - temporarily disabled
+// const paymentRoutes = require('./routes/paymentRoutes');
+// const adminSettingsRoutes = require('./routes/adminSettingsRoutes');
+// const reportRoutes = require('./routes/reportRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -32,9 +33,10 @@ app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/vouchers', voucherRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/payment', paymentRoutes);
-app.use('/api/settings', adminSettingsRoutes);
-app.use('/api/reports', reportRoutes);
+// TODO: Convert to PostgreSQL - temporarily disabled
+// app.use('/api/payment', paymentRoutes);
+// app.use('/api/settings', adminSettingsRoutes);
+// app.use('/api/reports', reportRoutes);
 
 // Root endpoint check
 app.get('/', (req, res) => {
