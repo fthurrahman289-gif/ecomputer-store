@@ -7,12 +7,12 @@ const pool = new Pool({
   ssl: process.env.DB_SSL !== 'false' ? { rejectUnauthorized: false } : false,
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 10000, // Increased to 10s for Vercel cold-start
 });
 
 pool.on('error', (err) => {
   console.error('Unexpected error on idle client', err);
-  process.exit(-1);
+  // Don't exit - let connection retry
 });
 
 pool.on('connect', () => {
