@@ -3,13 +3,13 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
-// Route Imports
-const authRoutes = require('./routes/authRoutes');
-const productRoutes = require('./routes/productRoutes');
-const wishlistRoutes = require('./routes/wishlistRoutes');
-const voucherRoutes = require('./routes/voucherRoutes');
-const orderRoutes = require('./routes/orderRoutes');
-const adminRoutes = require('./routes/adminRoutes');
+// Route Imports - Temporarily disabled for debugging
+// const authRoutes = require('./routes/authRoutes');
+// const productRoutes = require('./routes/productRoutes');
+// const wishlistRoutes = require('./routes/wishlistRoutes');
+// const voucherRoutes = require('./routes/voucherRoutes');
+// const orderRoutes = require('./routes/orderRoutes');
+// const adminRoutes = require('./routes/adminRoutes');
 // TODO: Convert to PostgreSQL - temporarily disabled
 // const paymentRoutes = require('./routes/paymentRoutes');
 // const adminSettingsRoutes = require('./routes/adminSettingsRoutes');
@@ -26,18 +26,6 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // Serve static directory for uploaded payment receipts
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// API Routes Mounting
-app.use('/api/auth', authRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/wishlist', wishlistRoutes);
-app.use('/api/vouchers', voucherRoutes);
-app.use('/api/orders', orderRoutes);
-app.use('/api/admin', adminRoutes);
-// TODO: Convert to PostgreSQL - temporarily disabled
-// app.use('/api/payment', paymentRoutes);
-// app.use('/api/settings', adminSettingsRoutes);
-// app.use('/api/reports', reportRoutes);
-
 // Root endpoint check
 app.get('/', (req, res) => {
   res.json({
@@ -45,6 +33,14 @@ app.get('/', (req, res) => {
     status: 'Running'
   });
 });
+
+// API Routes Mounting - Temporarily disabled for debugging
+// app.use('/api/auth', authRoutes);
+// app.use('/api/products', productRoutes);
+// app.use('/api/wishlist', wishlistRoutes);
+// app.use('/api/vouchers', voucherRoutes);
+// app.use('/api/orders', orderRoutes);
+// app.use('/api/admin', adminRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
