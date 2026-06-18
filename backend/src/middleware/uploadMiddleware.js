@@ -3,7 +3,9 @@ const path = require('path');
 const fs = require('fs');
 
 // Ensure the local uploads directory and subdirectories exist
-const uploadDir = path.join(__dirname, '../../uploads');
+// Di Vercel, sistem file bersifat Read-Only. Kita hanya bisa menulis ke /tmp
+const isVercel = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+const uploadDir = isVercel ? '/tmp/uploads' : path.join(__dirname, '../../uploads');
 const qrisDir = path.join(uploadDir, 'qris');
 
 if (!fs.existsSync(uploadDir)) {
