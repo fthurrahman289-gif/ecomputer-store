@@ -6,7 +6,7 @@
       "src": "src/index.js",
       "use": "@vercel/node",
       "config": {
-        "nodeVersion": "18.x"
+        "nodeVersion": "24.x"
       }
     }
   ],
