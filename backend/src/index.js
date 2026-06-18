@@ -88,7 +88,12 @@ app.use((err, req, res, next) => {
 
 if (require.main === module) {
   app.listen(PORT, () => {
-    console.log(`Server is running in modern mode on port ${PORT}`);
+    console.log('\n==========================================');
+    console.log(`✅ Server started successfully!`);
+    console.log(`📍 Port: ${PORT}`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`📚 Database: PostgreSQL (Supabase)`);
+    console.log('==========================================\n');
   });
 }
 

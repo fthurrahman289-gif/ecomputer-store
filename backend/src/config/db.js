@@ -1,11 +1,18 @@
 require('dotenv').config();
 const { Pool } = require('pg');
 
+// Validate DATABASE_URL exists
+if (!process.env.DATABASE_URL) {
+  console.error('❌ CRITICAL: DATABASE_URL environment variable is not set!');
+  console.error('Please add DATABASE_URL to Vercel environment variables.');
+  process.exit(1);
+}
+
 // PostgreSQL connection pool for Supabase - Optimized for Vercel Serverless
 // IMPORTANT: Use Supabase's pgBouncer pooling endpoint, NOT the direct endpoint
 // In Supabase dashboard: Settings > Database > Connection pooling > Copy Connection String (PgBouncer)
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || `postgresql://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_SERVER}:${process.env.DB_PORT || 5432}/${process.env.DB_DATABASE}`,
+  connectionString: process.env.DATABASE_URL,
   ssl: process.env.DB_SSL !== 'false' ? { rejectUnauthorized: false } : false,
   // ⚠️ SERVERLESS OPTIMIZATION: Reduced pool size for Vercel
   max: 3,  // Max connections per function instance
