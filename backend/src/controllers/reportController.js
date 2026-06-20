@@ -1,4 +1,4 @@
-const { poolPromise, sql } = require('../config/db');
+const { query } = require('../config/db');
 const { generateHTMLReport, generatePDFReport } = require('../utils/reportGenerator');
 
 // Get Report Data with Filters
@@ -6,8 +6,7 @@ const getReportData = async (req, res) => {
   const { startDate, endDate, category } = req.query;
 
   try {
-    const pool = await poolPromise;
-    let query = `
+    let sqlQuery = `
       SELECT 
         o.id,
         o.user_id,
@@ -20,53 +19,56 @@ const getReportData = async (req, res) => {
         o.net_amount,
         o.payment_method,
         COUNT(DISTINCT od.id) as item_count
-      FROM dbo.orders o
-      JOIN dbo.users u ON o.user_id = u.id
-      LEFT JOIN dbo.order_details od ON o.id = od.order_id
+      FROM orders o
+      JOIN users u ON o.user_id = u.id
+      LEFT JOIN order_details od ON o.id = od.order_id
       WHERE 1=1
     `;
 
-    const request = pool.request();
+    const params = [];
+    let paramIndex = 1;
 
     // Add date filter
     if (startDate) {
-      query += ` AND o.order_date >= @startDate`;
-      request.input('startDate', sql.DateTime, new Date(startDate));
+      sqlQuery += ` AND o.order_date >= $${paramIndex}`;
+      params.push(new Date(startDate));
+      paramIndex++;
     }
     if (endDate) {
       // Add 1 day to endDate to include the entire end date
       const endDateObj = new Date(endDate);
       endDateObj.setDate(endDateObj.getDate() + 1);
-      query += ` AND o.order_date < @endDate`;
-      request.input('endDate', sql.DateTime, endDateObj);
+      sqlQuery += ` AND o.order_date < $${paramIndex}`;
+      params.push(endDateObj);
+      paramIndex++;
     }
 
     // Add category filter
     if (category && category !== 'all') {
-      query += `
+      sqlQuery += `
         AND o.id IN (
           SELECT DISTINCT od.order_id
-          FROM dbo.order_details od
-          JOIN dbo.products p ON od.product_id = p.id
-          JOIN dbo.categories c ON p.category_id = c.id
-          WHERE c.slug = @category
+          FROM order_details od
+          JOIN products p ON od.product_id = p.id
+          JOIN categories c ON p.category_id = c.id
+          WHERE c.slug = $${paramIndex}
         )
       `;
-      request.input('category', sql.VarChar, category);
+      params.push(category);
+      paramIndex++;
     }
 
-    query += ` GROUP BY o.id, o.user_id, u.name, o.order_date, o.status, o.shipping_method, o.total_amount, o.discount_amount, o.net_amount, o.payment_method
+    sqlQuery += ` GROUP BY o.id, o.user_id, u.name, o.order_date, o.status, o.shipping_method, o.total_amount, o.discount_amount, o.net_amount, o.payment_method
                ORDER BY o.order_date DESC`;
 
-    const result = await request.query(query);
+    const result = await query(sqlQuery, params);
 
     // Get categories for filter
-    const categoriesRes = await pool.request()
-      .query('SELECT id, name, slug FROM dbo.categories ORDER BY name');
+    const categoriesRes = await query('SELECT id, name, slug FROM categories ORDER BY name');
 
     res.json({
-      orders: result.recordset,
-      categories: categoriesRes.recordset,
+      orders: result.rows,
+      categories: categoriesRes.rows,
       filters: {
         startDate: startDate || null,
         endDate: endDate || null,
@@ -84,8 +86,7 @@ const exportReportHTML = async (req, res) => {
   const { startDate, endDate, category } = req.query;
 
   try {
-    const pool = await poolPromise;
-    let query = `
+    let sqlQuery = `
       SELECT 
         o.id,
         o.user_id,
@@ -97,41 +98,45 @@ const exportReportHTML = async (req, res) => {
         o.discount_amount,
         o.net_amount,
         o.payment_method
-      FROM dbo.orders o
-      JOIN dbo.users u ON o.user_id = u.id
+      FROM orders o
+      JOIN users u ON o.user_id = u.id
       WHERE 1=1
     `;
 
-    const request = pool.request();
+    const params = [];
+    let paramIndex = 1;
 
     if (startDate) {
-      query += ` AND o.order_date >= @startDate`;
-      request.input('startDate', sql.DateTime, new Date(startDate));
+      sqlQuery += ` AND o.order_date >= $${paramIndex}`;
+      params.push(new Date(startDate));
+      paramIndex++;
     }
     if (endDate) {
       const endDateObj = new Date(endDate);
       endDateObj.setDate(endDateObj.getDate() + 1);
-      query += ` AND o.order_date < @endDate`;
-      request.input('endDate', sql.DateTime, endDateObj);
+      sqlQuery += ` AND o.order_date < $${paramIndex}`;
+      params.push(endDateObj);
+      paramIndex++;
     }
 
     if (category && category !== 'all') {
-      query += `
+      sqlQuery += `
         AND o.id IN (
           SELECT DISTINCT od.order_id
-          FROM dbo.order_details od
-          JOIN dbo.products p ON od.product_id = p.id
-          JOIN dbo.categories c ON p.category_id = c.id
-          WHERE c.slug = @category
+          FROM order_details od
+          JOIN products p ON od.product_id = p.id
+          JOIN categories c ON p.category_id = c.id
+          WHERE c.slug = $${paramIndex}
         )
       `;
-      request.input('category', sql.VarChar, category);
+      params.push(category);
+      paramIndex++;
     }
 
-    query += ` ORDER BY o.order_date DESC`;
+    sqlQuery += ` ORDER BY o.order_date DESC`;
 
-    const result = await request.query(query);
-    const htmlContent = generateHTMLReport(result.recordset, {
+    const result = await query(sqlQuery, params);
+    const htmlContent = generateHTMLReport(result.rows, {
       category: category || null,
       startDate: startDate || null,
       endDate: endDate || null
@@ -151,8 +156,7 @@ const exportReportPDF = async (req, res) => {
   const { startDate, endDate, category } = req.query;
 
   try {
-    const pool = await poolPromise;
-    let query = `
+    let sqlQuery = `
       SELECT 
         o.id,
         o.user_id,
@@ -164,41 +168,45 @@ const exportReportPDF = async (req, res) => {
         o.discount_amount,
         o.net_amount,
         o.payment_method
-      FROM dbo.orders o
-      JOIN dbo.users u ON o.user_id = u.id
+      FROM orders o
+      JOIN users u ON o.user_id = u.id
       WHERE 1=1
     `;
 
-    const request = pool.request();
+    const params = [];
+    let paramIndex = 1;
 
     if (startDate) {
-      query += ` AND o.order_date >= @startDate`;
-      request.input('startDate', sql.DateTime, new Date(startDate));
+      sqlQuery += ` AND o.order_date >= $${paramIndex}`;
+      params.push(new Date(startDate));
+      paramIndex++;
     }
     if (endDate) {
       const endDateObj = new Date(endDate);
       endDateObj.setDate(endDateObj.getDate() + 1);
-      query += ` AND o.order_date < @endDate`;
-      request.input('endDate', sql.DateTime, endDateObj);
+      sqlQuery += ` AND o.order_date < $${paramIndex}`;
+      params.push(endDateObj);
+      paramIndex++;
     }
 
     if (category && category !== 'all') {
-      query += `
+      sqlQuery += `
         AND o.id IN (
           SELECT DISTINCT od.order_id
-          FROM dbo.order_details od
-          JOIN dbo.products p ON od.product_id = p.id
-          JOIN dbo.categories c ON p.category_id = c.id
-          WHERE c.slug = @category
+          FROM order_details od
+          JOIN products p ON od.product_id = p.id
+          JOIN categories c ON p.category_id = c.id
+          WHERE c.slug = $${paramIndex}
         )
       `;
-      request.input('category', sql.VarChar, category);
+      params.push(category);
+      paramIndex++;
     }
 
-    query += ` ORDER BY o.order_date DESC`;
+    sqlQuery += ` ORDER BY o.order_date DESC`;
 
-    const result = await request.query(query);
-    const doc = await generatePDFReport(result.recordset, {
+    const result = await query(sqlQuery, params);
+    const doc = await generatePDFReport(result.rows, {
       category: category || null,
       startDate: startDate || null,
       endDate: endDate || null

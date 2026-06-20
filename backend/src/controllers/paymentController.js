@@ -1,15 +1,13 @@
-const { poolPromise, sql } = require('../config/db');
+const { query } = require('../config/db');
 const path = require('path');
 const fs = require('fs').promises;
 
 // Get all payment settings
 const getPaymentSettings = async (req, res) => {
   try {
-    const pool = await poolPromise;
-    const result = await pool.request()
-      .query('SELECT * FROM dbo.payment_settings ORDER BY payment_method');
+    const result = await query('SELECT * FROM payment_settings ORDER BY payment_method');
     
-    res.json(result.recordset);
+    res.json(result.rows);
   } catch (error) {
     console.error('Error fetching payment settings:', error);
     res.status(500).json({ message: 'Gagal mengambil pengaturan pembayaran' });
@@ -20,17 +18,14 @@ const getPaymentSettings = async (req, res) => {
 const getPaymentSetting = async (req, res) => {
   try {
     const { paymentMethod } = req.params;
-    const pool = await poolPromise;
     
-    const result = await pool.request()
-      .input('method', sql.VarChar, paymentMethod)
-      .query('SELECT * FROM dbo.payment_settings WHERE payment_method = @method');
+    const result = await query('SELECT * FROM payment_settings WHERE payment_method = $1', [paymentMethod]);
     
-    if (result.recordset.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Pengaturan pembayaran tidak ditemukan' });
     }
     
-    res.json(result.recordset[0]);
+    res.json(result.rows[0]);
   } catch (error) {
     console.error('Error fetching payment setting:', error);
     res.status(500).json({ message: 'Gagal mengambil pengaturan pembayaran' });
@@ -43,37 +38,33 @@ const updatePaymentSetting = async (req, res) => {
     const { paymentMethod } = req.params;
     const { bank_name, account_number, account_holder_name, whatsapp_number, is_active } = req.body;
     
-    const pool = await poolPromise;
-    
     // Check if setting exists
-    const checkResult = await pool.request()
-      .input('method', sql.VarChar, paymentMethod)
-      .query('SELECT id FROM dbo.payment_settings WHERE payment_method = @method');
+    const checkResult = await query('SELECT id FROM payment_settings WHERE payment_method = $1', [paymentMethod]);
     
-    if (checkResult.recordset.length === 0) {
+    if (checkResult.rows.length === 0) {
       return res.status(404).json({ message: 'Pengaturan pembayaran tidak ditemukan' });
     }
     
     // Update existing setting
-    const query = `
-      UPDATE dbo.payment_settings 
-      SET bank_name = @bankName,
-          account_number = @accountNumber,
-          account_holder_name = @accountHolderName,
-          whatsapp_number = @whatsappNumber,
-          is_active = @isActive,
-          updated_at = GETDATE()
-      WHERE payment_method = @method
+    const sqlQuery = `
+      UPDATE payment_settings 
+      SET bank_name = $1,
+          account_number = $2,
+          account_holder_name = $3,
+          whatsapp_number = $4,
+          is_active = $5,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE payment_method = $6
     `;
     
-    await pool.request()
-      .input('method', sql.VarChar, paymentMethod)
-      .input('bankName', sql.NVarChar, bank_name || null)
-      .input('accountNumber', sql.VarChar, account_number || null)
-      .input('accountHolderName', sql.NVarChar, account_holder_name || null)
-      .input('whatsappNumber', sql.VarChar, whatsapp_number || null)
-      .input('isActive', sql.Bit, is_active ? 1 : 0)
-      .query(query);
+    await query(sqlQuery, [
+      bank_name || null,
+      account_number || null,
+      account_holder_name || null,
+      whatsapp_number || null,
+      is_active ? true : false,
+      paymentMethod
+    ]);
     
     res.json({ message: 'Pengaturan pembayaran berhasil diperbarui' });
   } catch (error) {
@@ -97,37 +88,26 @@ const uploadQrisImage = async (req, res) => {
       return res.status(400).json({ message: 'File harus berupa gambar (JPEG, PNG, WebP)' });
     }
 
-    const pool = await poolPromise;
     const newQrisPath = `/uploads/qris/${req.file.filename}`;
 
     // Get old QRIS image path to delete it
-    const oldResult = await pool.request()
-      .input('method', sql.VarChar, 'QRIS')
-      .query(`SELECT qris_image_path FROM dbo.payment_settings WHERE payment_method = @method`);
-
-    const oldQrisPath = oldResult.recordset.length > 0 ? oldResult.recordset[0].qris_image_path : null;
+    const oldResult = await query(`SELECT qris_image_path FROM payment_settings WHERE payment_method = $1`, ['QRIS']);
+    const oldQrisPath = oldResult.rows.length > 0 ? oldResult.rows[0].qris_image_path : null;
 
     // Update QRIS image path
-    const result = await pool.request()
-      .input('method', sql.VarChar, 'QRIS')
-      .input('qrisPath', sql.NVarChar, newQrisPath)
-      .query(`
-        UPDATE dbo.payment_settings 
-        SET qris_image_path = @qrisPath, 
-            updated_at = GETDATE()
-        WHERE payment_method = @method
-      `);
+    const result = await query(`
+        UPDATE payment_settings 
+        SET qris_image_path = $1, 
+            updated_at = CURRENT_TIMESTAMP
+        WHERE payment_method = $2
+      `, [newQrisPath, 'QRIS']);
 
     // If no rows updated, insert new QRIS record
-    if (result.rowsAffected[0] === 0) {
-      await pool.request()
-        .input('method', sql.VarChar, 'QRIS')
-        .input('qrisPath', sql.NVarChar, newQrisPath)
-        .input('whatsappNumber', sql.VarChar, null)
-        .query(`
-          INSERT INTO dbo.payment_settings (payment_method, qris_image_path, whatsapp_number, is_active)
-          VALUES (@method, @qrisPath, @whatsappNumber, 1)
-        `);
+    if (result.rowCount === 0) {
+      await query(`
+          INSERT INTO payment_settings (payment_method, qris_image_path, whatsapp_number, is_active)
+          VALUES ($1, $2, $3, true)
+        `, ['QRIS', newQrisPath, null]);
     }
 
     // Delete old file if exists
@@ -154,28 +134,22 @@ const uploadQrisImage = async (req, res) => {
 // Delete QRIS image
 const deleteQrisImage = async (req, res) => {
   try {
-    const pool = await poolPromise;
-    
     // Get current QRIS image path
-    const result = await pool.request()
-      .input('method', sql.VarChar, 'QRIS')
-      .query(`SELECT qris_image_path FROM dbo.payment_settings WHERE payment_method = @method`);
+    const result = await query(`SELECT qris_image_path FROM payment_settings WHERE payment_method = $1`, ['QRIS']);
     
-    if (result.recordset.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({ message: 'QRIS belum dikonfigurasi' });
     }
     
-    const qrisPath = result.recordset[0].qris_image_path;
+    const qrisPath = result.rows[0].qris_image_path;
     
     // Update database to remove image path
-    await pool.request()
-      .input('method', sql.VarChar, 'QRIS')
-      .query(`
-        UPDATE dbo.payment_settings 
+    await query(`
+        UPDATE payment_settings 
         SET qris_image_path = NULL, 
-            updated_at = GETDATE()
-        WHERE payment_method = @method
-      `);
+            updated_at = CURRENT_TIMESTAMP
+        WHERE payment_method = $1
+      `, ['QRIS']);
     
     // Delete file from server if exists
     if (qrisPath) {
@@ -195,20 +169,17 @@ const deleteQrisImage = async (req, res) => {
 // Get QRIS image path
 const getQrisImage = async (req, res) => {
   try {
-    const pool = await poolPromise;
-    const result = await pool.request()
-      .input('method', sql.VarChar, 'QRIS')
-      .query(`
+    const result = await query(`
         SELECT qris_image_path, whatsapp_number, is_active 
-        FROM dbo.payment_settings 
-        WHERE payment_method = @method
-      `);
+        FROM payment_settings 
+        WHERE payment_method = $1
+      `, ['QRIS']);
 
-    if (result.recordset.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({ message: 'QRIS belum dikonfigurasi' });
     }
 
-    res.json(result.recordset[0]);
+    res.json(result.rows[0]);
   } catch (error) {
     console.error('Error fetching QRIS image:', error);
     res.status(500).json({ message: 'Gagal mengambil data QRIS' });
@@ -224,51 +195,47 @@ const upsertPaymentSetting = async (req, res) => {
       return res.status(400).json({ message: 'Metode pembayaran wajib diisi' });
     }
 
-    const pool = await poolPromise;
-
     // Check if exists
-    const checkResult = await pool.request()
-      .input('method', sql.VarChar, paymentMethod)
-      .query('SELECT id FROM dbo.payment_settings WHERE payment_method = @method');
+    const checkResult = await query('SELECT id FROM payment_settings WHERE payment_method = $1', [paymentMethod]);
 
-    if (checkResult.recordset.length > 0) {
+    if (checkResult.rows.length > 0) {
       // Update
-      await pool.request()
-        .input('method', sql.VarChar, paymentMethod)
-        .input('bankName', sql.NVarChar, bank_name || null)
-        .input('accountNumber', sql.VarChar, account_number || null)
-        .input('accountHolderName', sql.NVarChar, account_holder_name || null)
-        .input('whatsappNumber', sql.VarChar, whatsapp_number || null)
-        .input('ovoNumber', sql.VarChar, ovo_number || null)
-        .input('gopayNumber', sql.VarChar, gopay_number || null)
-        .input('isActive', sql.Bit, is_active ? 1 : 0)
-        .query(`
-          UPDATE dbo.payment_settings 
-          SET bank_name = @bankName,
-              account_number = @accountNumber,
-              account_holder_name = @accountHolderName,
-              whatsapp_number = @whatsappNumber,
-              ovo_number = @ovoNumber,
-              gopay_number = @gopayNumber,
-              is_active = @isActive,
-              updated_at = GETDATE()
-          WHERE payment_method = @method
-        `);
+      await query(`
+          UPDATE payment_settings 
+          SET bank_name = $1,
+              account_number = $2,
+              account_holder_name = $3,
+              whatsapp_number = $4,
+              ovo_number = $5,
+              gopay_number = $6,
+              is_active = $7,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE payment_method = $8
+        `, [
+          bank_name || null,
+          account_number || null,
+          account_holder_name || null,
+          whatsapp_number || null,
+          ovo_number || null,
+          gopay_number || null,
+          is_active ? true : false,
+          paymentMethod
+        ]);
     } else {
       // Insert
-      await pool.request()
-        .input('method', sql.VarChar, paymentMethod)
-        .input('bankName', sql.NVarChar, bank_name || null)
-        .input('accountNumber', sql.VarChar, account_number || null)
-        .input('accountHolderName', sql.NVarChar, account_holder_name || null)
-        .input('whatsappNumber', sql.VarChar, whatsapp_number || null)
-        .input('ovoNumber', sql.VarChar, ovo_number || null)
-        .input('gopayNumber', sql.VarChar, gopay_number || null)
-        .input('isActive', sql.Bit, is_active ? 1 : 0)
-        .query(`
-          INSERT INTO dbo.payment_settings (payment_method, bank_name, account_number, account_holder_name, whatsapp_number, ovo_number, gopay_number, is_active)
-          VALUES (@method, @bankName, @accountNumber, @accountHolderName, @whatsappNumber, @ovoNumber, @gopayNumber, @isActive)
-        `);
+      await query(`
+          INSERT INTO payment_settings (payment_method, bank_name, account_number, account_holder_name, whatsapp_number, ovo_number, gopay_number, is_active)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `, [
+          paymentMethod,
+          bank_name || null,
+          account_number || null,
+          account_holder_name || null,
+          whatsapp_number || null,
+          ovo_number || null,
+          gopay_number || null,
+          is_active ? true : false
+        ]);
     }
 
     res.json({ message: 'Pengaturan pembayaran berhasil disimpan' });
@@ -287,47 +254,43 @@ const saveBankSettings = async (req, res) => {
       return res.status(400).json({ message: 'Data bank tidak valid' });
     }
 
-    const pool = await poolPromise;
-
     // Save each bank
     for (const bank of banks) {
       if (!bank.bank_name || !bank.account_number || !bank.account_holder_name) {
-        return res.status(400).json({ message: `Data bank ${bank.bank_name} belum lengkap` });
+        return res.status(400).json({ message: \`Data bank \${bank.bank_name} belum lengkap\` });
       }
 
-      const checkResult = await pool.request()
-        .input('method', sql.VarChar, `Transfer Bank - ${bank.bank_name}`)
-        .query('SELECT id FROM dbo.payment_settings WHERE payment_method = @method');
+      const checkResult = await query('SELECT id FROM payment_settings WHERE payment_method = $1', [\`Transfer Bank - \${bank.bank_name}\`]);
 
-      if (checkResult.recordset.length > 0) {
+      if (checkResult.rows.length > 0) {
         // Update
-        await pool.request()
-          .input('method', sql.VarChar, `Transfer Bank - ${bank.bank_name}`)
-          .input('bankName', sql.NVarChar, bank.bank_name)
-          .input('accountNumber', sql.VarChar, bank.account_number)
-          .input('accountHolderName', sql.NVarChar, bank.account_holder_name)
-          .input('isActive', sql.Bit, bank.is_active ? 1 : 0)
-          .query(`
-            UPDATE dbo.payment_settings 
-            SET bank_name = @bankName,
-                account_number = @accountNumber,
-                account_holder_name = @accountHolderName,
-                is_active = @isActive,
-                updated_at = GETDATE()
-            WHERE payment_method = @method
-          `);
+        await query(`
+            UPDATE payment_settings 
+            SET bank_name = $1,
+                account_number = $2,
+                account_holder_name = $3,
+                is_active = $4,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE payment_method = $5
+          `, [
+            bank.bank_name,
+            bank.account_number,
+            bank.account_holder_name,
+            bank.is_active ? true : false,
+            \`Transfer Bank - \${bank.bank_name}\`
+          ]);
       } else {
         // Insert
-        await pool.request()
-          .input('method', sql.VarChar, `Transfer Bank - ${bank.bank_name}`)
-          .input('bankName', sql.NVarChar, bank.bank_name)
-          .input('accountNumber', sql.VarChar, bank.account_number)
-          .input('accountHolderName', sql.NVarChar, bank.account_holder_name)
-          .input('isActive', sql.Bit, bank.is_active ? 1 : 0)
-          .query(`
-            INSERT INTO dbo.payment_settings (payment_method, bank_name, account_number, account_holder_name, is_active)
-            VALUES (@method, @bankName, @accountNumber, @accountHolderName, @isActive)
-          `);
+        await query(`
+            INSERT INTO payment_settings (payment_method, bank_name, account_number, account_holder_name, is_active)
+            VALUES ($1, $2, $3, $4, $5)
+          `, [
+            \`Transfer Bank - \${bank.bank_name}\`,
+            bank.bank_name,
+            bank.account_number,
+            bank.account_holder_name,
+            bank.is_active ? true : false
+          ]);
       }
     }
 

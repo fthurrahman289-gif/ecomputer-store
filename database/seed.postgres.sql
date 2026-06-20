@@ -4,12 +4,12 @@
 -- Run this AFTER schema.postgres.sql has been executed
 
 -- Seed Users:
--- Admin password: 'adminpassword' -> bcrypt: $2b$10$k1wXbN3K5e2c5w0gI1e0DuB0X7y7K2U7.h97/FfKz0o9W2vU5n.yq
--- Customer password: 'customerpassword' -> bcrypt: $2a$10$k0mpBf8NoXBMUOIJw8Hlk.7Tmq9m3JZtOM.O0RpiY5k1acqiXVzD.
+-- Admin password: 'adminpassword' -> bcrypt: $2a$10$JDMdee23c5wzuefgSFuI3uua9XjMU8CG.C40LiWaoWRPWOqsAZVYi
+-- Customer password: 'customerpassword' -> bcrypt: $2a$10$goCs2e36KXGbIIGc7vWqpe7hxyqTUF/eZMK51S5E0l3dyG7Y4KeVu
 INSERT INTO users (name, username, email, password, phone, address, role) VALUES 
-('Admin E-Computer', 'admin', 'admin@ecomputer.com', '$2b$10$k1wXbN3K5e2c5w0gI1e0DuB0X7y7K2U7.h97/FfKz0o9W2vU5n.yq', '081234567890', 'Ruko Cyber Mall Lantai 2, Jakarta', 'admin'),
-('Budi Setiawan', 'budi', 'budi@gmail.com', '$2a$10$k0mpBf8NoXBMUOIJw8Hlk.7Tmq9m3JZtOM.O0RpiY5k1acqiXVzD.', '082198765432', 'Jl. Mangga Besar No. 45, Jakarta Barat', 'customer'),
-('Rian Hidayat', 'rian', 'rian@gmail.com', '$2a$10$k0mpBf8NoXBMUOIJw8Hlk.7Tmq9m3JZtOM.O0RpiY5k1acqiXVzD.', '085712345678', 'Jl. Dago No. 12, Bandung', 'customer');
+('Admin E-Computer', 'admin', 'admin@ecomputer.com', '$2a$10$JDMdee23c5wzuefgSFuI3uua9XjMU8CG.C40LiWaoWRPWOqsAZVYi', '081234567890', 'Ruko Cyber Mall Lantai 2, Jakarta', 'admin'),
+('Budi Setiawan', 'budi', 'budi@gmail.com', '$2a$10$goCs2e36KXGbIIGc7vWqpe7hxyqTUF/eZMK51S5E0l3dyG7Y4KeVu', '082198765432', 'Jl. Mangga Besar No. 45, Jakarta Barat', 'customer'),
+('Rian Hidayat', 'rian', 'rian@gmail.com', '$2a$10$goCs2e36KXGbIIGc7vWqpe7hxyqTUF/eZMK51S5E0l3dyG7Y4KeVu', '085712345678', 'Jl. Dago No. 12, Bandung', 'customer');
 
 -- Seed Categories:
 INSERT INTO categories (name, slug, description) VALUES

@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import ProductImageUploader from '../components/ProductImageUploader';
 import AdminReports from './AdminReports';
+import AdminSettings from './AdminSettings';
 
 const AdminDashboard = () => {
   const { user, token } = useContext(AppContext);
@@ -384,7 +385,8 @@ const AdminDashboard = () => {
             { id: 'orders', label: 'Kelola Order', icon: <ShoppingBag size={18} /> },
             { id: 'vouchers', label: 'Kelola Voucher', icon: <Ticket size={18} /> },
             { id: 'users', label: 'Kelola User', icon: <Users size={18} /> },
-            { id: 'reports', label: 'Laporan Penjualan', icon: <Printer size={18} /> }
+            { id: 'reports', label: 'Laporan Penjualan', icon: <Printer size={18} /> },
+            { id: 'settings', label: 'Pengaturan', icon: <Settings size={18} /> }
           ].map((tab) => (
             <button
               key={tab.id}
@@ -805,6 +807,10 @@ const AdminDashboard = () => {
 
         {activeTab === 'reports' && (
           <AdminReports />
+        )}
+
+        {activeTab === 'settings' && (
+          <AdminSettings />
         )}
 
       </main>

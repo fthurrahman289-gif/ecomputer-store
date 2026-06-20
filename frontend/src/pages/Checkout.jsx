@@ -39,6 +39,7 @@ const Checkout = () => {
 
   const [address, setAddress] = useState(user ? user.address || '' : '');
   const [phone, setPhone] = useState(user ? user.phone || '' : '');
+  const [receiverName, setReceiverName] = useState(user ? user.name || '' : '');
   const [shippingMethod, setShippingMethod] = useState('Pengiriman');
   const [paymentMethod, setPaymentMethod] = useState('Transfer Bank');
   const [loading, setLoading] = useState(false);
@@ -81,7 +82,15 @@ const Checkout = () => {
         setPaymentMethod('Transfer Bank');
       }
     }
-  }, [shippingMethod]);
+
+    if (shippingMethod === 'Ambil di Toko') {
+      setPhone('');
+      setAddress('');
+    } else if (shippingMethod === 'Pengiriman') {
+      setPhone(user ? user.phone || '' : '');
+      setAddress(user ? user.address || '' : '');
+    }
+  }, [shippingMethod, user, paymentMethod]);
 
   // Automatically reset payment method to bank transfer if e-wallet is disabled
   useEffect(() => {
@@ -168,7 +177,7 @@ const Checkout = () => {
           phone,
           paymentMethod,
           shippingMethod,
-          customerName: shippingMethod === 'Pembelian di Toko' ? customerName : undefined
+          customerName: shippingMethod === 'Pembelian di Toko' ? customerName : (isAdmin ? receiverName : undefined)
         })
       });
 
@@ -296,12 +305,13 @@ const Checkout = () => {
                 </div>
               ) : (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Nama Penerima</label>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">{shippingMethod === 'Ambil di Toko' ? 'Nama Pengambil' : 'Nama Penerima'}</label>
                   <input 
                     type="text" 
-                    value={user ? user.name : ''} 
-                    disabled 
-                    className="w-full bg-slate-100 border border-slate-200 rounded-xl p-3 text-sm text-slate-600 cursor-not-allowed"
+                    value={receiverName} 
+                    onChange={(e) => setReceiverName(e.target.value)}
+                    disabled={!isAdmin} 
+                    className={`w-full border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 ${!isAdmin ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-white text-slate-800'}`}
                   />
                 </div>
               )}
